@@ -24,8 +24,15 @@ const titleParts = [
   { text: "AND LEAVE ADMINISTRATION", accent: false }
 ];
 
-/** Short rules from the FAQ answers, shown in the scrolling strip under the hero. */
-const tickerItems = ["40-hour workweek", "4 attendance entries per onsite workday", "DTR due within 5 working days", "Prior authorization before overtime", "Get OB approval first", "Keep proof of attendance", "Never falsify attendance records"];
+/** Myth-or-fact statements; each verdict and note is taken from the linked FAQ answer. */
+const quiz = [
+  { statement: "With an approved FWA, I can choose my own working hours.", fact: false, note: "You must follow the work schedule approved for you, plus the rules on attendance and reporting.", faq: "work-schedule-3" },
+  { statement: "Working past my regular hours automatically earns overtime pay.", fact: false, note: "Overtime needs approval first, and must follow the rules before pay or time credits apply.", faq: "work-schedule-4" },
+  { statement: "Employees on an approved FWA still need to record their attendance.", fact: true, note: "Yes, unless another authorized attendance monitoring arrangement applies.", faq: "attendance-recording-4" },
+  { statement: "I have five working days to submit my validated DTR.", fact: true, note: "Counted from when you receive it or it becomes available, unless another deadline is announced.", faq: "daily-time-record-1" },
+  { statement: "I can write my attendance entries by hand whenever I want.", fact: false, note: "Only if the system is unavailable or there is another valid reason, with proof and validation.", faq: "daily-time-record-3" },
+  { statement: "I need approval before going on official business (OB).", fact: true, note: "Yes, except in emergencies when getting prior approval isn't possible.", faq: "official-business-1" }
+];
 const popularSearches = ["DTR", "Biometric", "Overtime", "OB", "FWA"];
 
 const ease = [0.22, 1, 0.36, 1] as const;
@@ -112,6 +119,65 @@ function HeroVisual({ pointerX, pointerY }: { pointerX: MotionValue<number>; poi
       </motion.div>
     </motion.div>
   </div>;
+}
+
+/** "Myth or fact?" quick check; "Read full answer" links open the FAQ popup via the URL hash. */
+function MythOrFact() {
+  const [index, setIndex] = useState(0);
+  const [picked, setPicked] = useState<boolean | null>(null);
+  const [score, setScore] = useState(0);
+  const nextRef = useRef<HTMLButtonElement>(null);
+  const done = index >= quiz.length;
+  const item = quiz[Math.min(index, quiz.length - 1)];
+  const correct = picked === item.fact;
+
+  useEffect(() => { if (picked !== null) nextRef.current?.focus({ preventScroll: true }); }, [picked]);
+
+  function answer(fact: boolean) {
+    if (picked !== null) return;
+    setPicked(fact);
+    if (fact === item.fact) setScore((value) => value + 1);
+  }
+  function next() { setPicked(null); setIndex((value) => value + 1); }
+  function restart() { setPicked(null); setScore(0); setIndex(0); }
+
+  return <section className="quiz-section section-space" aria-labelledby="quiz-heading">
+    <div className="container quiz-grid">
+      <motion.div className="quiz-intro" variants={stagger(0.1)} {...inView}>
+        <motion.p className="section-kicker" variants={fadeUp}>QUICK CHECK</motion.p>
+        <motion.h2 id="quiz-heading" variants={fadeUp}>Myth or fact?</motion.h2>
+        <motion.p variants={fadeUp}>Six common assumptions about schedules, attendance, and official business. See how many you get right.</motion.p>
+        <motion.div className="quiz-progress" variants={fadeUp} aria-hidden="true">{quiz.map((_, step) => <span key={step} className={step < index ? "is-done" : step === index ? "is-current" : undefined} />)}</motion.div>
+      </motion.div>
+      <motion.div className="quiz-stage" aria-live="polite" variants={fadeUp} {...inView}>
+        <AnimatePresence mode="wait" initial={false}>
+          {done ? <motion.div key="done" className="quiz-card quiz-done" initial={{ opacity: 0, scale: 0.94 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.96 }} transition={{ type: "spring", stiffness: 300, damping: 26 }}>
+            <span className="quiz-score"><CountUp to={score} /><small>/{quiz.length}</small></span>
+            <h3>{score === quiz.length ? "Perfect score!" : score >= 4 ? "Nicely done." : "Worth a quick review."}</h3>
+            <p>Open the topics above for the full answers.</p>
+            <motion.button className="quiz-primary" type="button" whileTap={tap} onClick={restart}>Try again <ArrowRight size={15} /></motion.button>
+          </motion.div> : <motion.div key={index} className="quiz-card" initial={{ opacity: 0, x: 48, rotate: 2 }} animate={{ opacity: 1, x: 0, rotate: 0 }} exit={{ opacity: 0, x: -48, rotate: -2 }} transition={{ duration: 0.35, ease }}>
+            <span className="quiz-count">{index + 1} / {quiz.length}</span>
+            <p className="quiz-statement">“{item.statement}”</p>
+            {picked === null ? <div className="quiz-actions">
+              <motion.button className="quiz-btn is-myth" type="button" whileHover={{ y: -2 }} whileTap={tap} onClick={() => answer(false)}><X size={18} /> Myth</motion.button>
+              <motion.button className="quiz-btn is-fact" type="button" whileHover={{ y: -2 }} whileTap={tap} onClick={() => answer(true)}><Check size={18} /> Fact</motion.button>
+            </div> : <motion.div className={correct ? "quiz-verdict is-right" : "quiz-verdict is-wrong"} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, ease }}>
+              <motion.span className="quiz-badge" initial={{ scale: 0.4 }} animate={{ scale: 1 }} transition={{ type: "spring", stiffness: 500, damping: 18 }}>{correct ? <Check size={18} /> : <X size={18} />}</motion.span>
+              <div>
+                <strong>{correct ? "Correct" : "Not quite"}: it’s a {item.fact ? "fact" : "myth"}.</strong>
+                <p>{item.note}</p>
+                <div className="quiz-links">
+                  <a href={`#${item.faq}`}>Read full answer <ArrowUpRight size={14} /></a>
+                  <motion.button ref={nextRef} className="quiz-primary" type="button" whileTap={tap} onClick={next}>{index + 1 === quiz.length ? "See my score" : "Next"} <ArrowRight size={15} /></motion.button>
+                </div>
+              </div>
+            </motion.div>}
+          </motion.div>}
+        </AnimatePresence>
+      </motion.div>
+    </div>
+  </section>;
 }
 
 type OpenState = { id: string; faq?: string; sheet: boolean; origin: { x: number; y: number } };
@@ -358,10 +424,6 @@ export function FaqSite() {
         </div>
       </section>
 
-      <div className="ticker" aria-hidden="true">
-        <div className="ticker-track">{[...tickerItems, ...tickerItems].map((item, index) => <span key={index}>{item}</span>)}</div>
-      </div>
-
       <section className="category-section section-space" id="faqs" aria-labelledby="category-heading">
         <div className="container">
           <motion.div className="section-heading" variants={stagger(0.1)} {...inView}>
@@ -414,6 +476,8 @@ export function FaqSite() {
           </div>
         </div>
       </section>
+
+      <MythOrFact />
 
       <section className="verification"><motion.div className="container verification-inner" variants={fadeUp} {...inView}><ShieldCheck size={27} /><div><h2>A note on official guidance</h2><p>This website is an informational reference. For official interpretation or approval, consult the current signed DOLE issuances and your authorized HR/personnel office.</p></div></motion.div></section>
     </main>
