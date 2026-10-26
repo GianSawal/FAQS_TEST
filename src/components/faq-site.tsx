@@ -139,12 +139,13 @@ function FaqDialog({ category, Icon, faqId, sheet, origin, onClose }: { category
     panelRef.current?.querySelectorAll<HTMLDetailsElement>("details.faq-item").forEach((item) => { item.open = open; });
   }
 
+  // Scroll lock reflows the whole page, so on phones it waits until the sheet has landed.
   useEffect(() => {
     const previous = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    panelRef.current?.focus();
-    return () => { document.body.style.overflow = previous; };
-  }, []);
+    panelRef.current?.focus({ preventScroll: true });
+    const timer = window.setTimeout(() => { document.body.style.overflow = "hidden"; }, sheet ? 420 : 0);
+    return () => { window.clearTimeout(timer); document.body.style.overflow = previous; };
+  }, [sheet]);
 
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
@@ -172,8 +173,8 @@ function FaqDialog({ category, Icon, faqId, sheet, origin, onClose }: { category
   return <>
     <motion.div className="dialog-backdrop" onClick={onClose} aria-hidden="true" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.25 }} />
     <div className="dialog-layer">
-      <motion.div ref={panelRef} className="dialog-panel" role="dialog" aria-modal="true" aria-labelledby="dialog-title" tabIndex={-1} style={{ pointerEvents: isPresent ? undefined : "none" }}
-        initial={from} animate={sheet ? { y: 0 } : { opacity: 1, scale: 1, x: 0, y: 0 }} exit={{ ...from, transition: { duration: 0.22, ease } }} transition={{ type: "spring", stiffness: 320, damping: 34 }}
+      <motion.div ref={panelRef} className={sheet ? "dialog-panel is-sheet" : "dialog-panel"} role="dialog" aria-modal="true" aria-labelledby="dialog-title" tabIndex={-1} style={{ pointerEvents: isPresent ? undefined : "none" }}
+        initial={sheet ? false : from} animate={sheet ? { y: 0 } : { opacity: 1, scale: 1, x: 0, y: 0 }} exit={{ ...from, transition: { duration: 0.22, ease } }} transition={{ type: "spring", stiffness: 320, damping: 34 }}
         drag={sheet ? "y" : false} dragControls={dragControls} dragListener={false} dragConstraints={{ top: 0, bottom: 0 }} dragElastic={{ top: 0, bottom: 0.6 }}
         onDragEnd={(_, info) => { if (info.offset.y > 110 || info.velocity.y > 600) onClose(); }}>
         <div className="dialog-head">
@@ -186,7 +187,7 @@ function FaqDialog({ category, Icon, faqId, sheet, origin, onClose }: { category
           <p className="dialog-desc">{category.description}</p>
           <div className="faq-list-actions"><button type="button" onClick={() => toggleAll(true)}>Expand all</button><button type="button" onClick={() => toggleAll(false)}>Collapse all</button></div>
         </div>
-        <motion.div className="dialog-body" variants={stagger(0.06, 0.15)} initial="hidden" animate="show">
+        <motion.div className="dialog-body" variants={stagger(0.06, 0.15)} initial={sheet ? false : "hidden"} animate="show">
           <div className="accordion-list">
             {category.faqs.map((faq, index) => <motion.details className="faq-item" id={faq.id} key={faq.id} variants={fadeUp}>
               <summary className="faq-trigger"><span className="faq-question-index" aria-hidden="true">{String(index + 1).padStart(2, "0")}</span><h4>{faq.question}</h4><span className="faq-reveal"><span className="faq-reveal-open">Read answer</span><span className="faq-reveal-close">Close answer</span><ChevronDown size={18} aria-hidden="true" /></span></summary>
