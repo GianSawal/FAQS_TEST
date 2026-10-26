@@ -24,6 +24,10 @@ const titleParts = [
   { text: "AND LEAVE ADMINISTRATION", accent: false }
 ];
 
+/** Short rules from the FAQ answers, shown in the scrolling strip under the hero. */
+const tickerItems = ["40-hour workweek", "4 attendance entries per onsite workday", "DTR due within 5 working days", "Prior authorization before overtime", "Get OB approval first", "Keep proof of attendance", "Never falsify attendance records"];
+const popularSearches = ["DTR", "Biometric", "Overtime", "OB", "FWA"];
+
 const ease = [0.22, 1, 0.36, 1] as const;
 const fadeUp: Variants = { hidden: { opacity: 0, y: 18 }, show: { opacity: 1, y: 0, transition: { duration: 0.6, ease } } };
 const wordReveal: Variants = { hidden: { opacity: 0, y: "0.35em" }, show: { opacity: 1, y: 0, transition: { duration: 0.6, ease } } };
@@ -354,6 +358,10 @@ export function FaqSite() {
         </div>
       </section>
 
+      <div className="ticker" aria-hidden="true">
+        <div className="ticker-track">{[...tickerItems, ...tickerItems].map((item, index) => <span key={index}>{item}</span>)}</div>
+      </div>
+
       <section className="category-section section-space" id="faqs" aria-labelledby="category-heading">
         <div className="container">
           <motion.div className="section-heading" variants={stagger(0.1)} {...inView}>
@@ -369,6 +377,10 @@ export function FaqSite() {
                 <span className="faq-search-shortcut" aria-hidden="true">Ctrl / ⌘ K</span>
               </div>
             </div>
+            <div className="search-chips"><span>POPULAR</span>{popularSearches.map((item) => {
+              const active = term === item.toLocaleLowerCase();
+              return <motion.button className={active ? "search-chip is-active" : "search-chip"} type="button" key={item} aria-pressed={active} whileTap={tap} onClick={() => setQuery(active ? "" : item)}>{item}</motion.button>;
+            })}</div>
             {term ? <motion.div className="search-results" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, ease }}>
               <div className="results-bar">
                 <div><strong>Results for “{query.trim()}”</strong><span>{matches.length} {matches.length === 1 ? "answer" : "answers"}</span></div>
@@ -388,7 +400,12 @@ export function FaqSite() {
                 const Icon = categoryIcons[index];
                 return <motion.button className="category-card" type="button" key={category.id} aria-haspopup="dialog" variants={fadeUp} whileHover={{ y: -5 }} whileTap={{ scale: 0.985 }} transition={{ type: "spring", stiffness: 400, damping: 30 }} onPointerMove={trackSpotlight} onClick={(event) => openDialog(category.id, undefined, event.currentTarget)}>
                   <span className="category-icon"><Icon size={27} strokeWidth={1.8} /></span>
-                  <span className="category-content"><span className="category-title">{category.title}</span><span className="category-description">{category.description}</span><span className="category-count">{category.faqs.length} FAQs</span></span>
+                  <span className="category-content">
+                    <span className="category-title">{category.title}</span>
+                    <span className="category-description">{category.description}</span>
+                    <span className="category-preview">{category.faqs.slice(0, 2).map((faq) => <span key={faq.id}>{faq.question}</span>)}</span>
+                    <span className="category-foot"><span className="category-count">{category.faqs.length} FAQs</span><span className="category-open">Open topic <ArrowRight size={14} /></span></span>
+                  </span>
                   <ArrowUpRight className="category-arrow" size={20} />
                 </motion.button>;
               })}</motion.div>
