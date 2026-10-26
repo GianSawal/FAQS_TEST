@@ -26,7 +26,7 @@ const titleParts = [
 
 const ease = [0.22, 1, 0.36, 1] as const;
 const fadeUp: Variants = { hidden: { opacity: 0, y: 18 }, show: { opacity: 1, y: 0, transition: { duration: 0.6, ease } } };
-const wordReveal: Variants = { hidden: { opacity: 0, y: "0.35em", filter: "blur(8px)" }, show: { opacity: 1, y: 0, filter: "blur(0px)", transition: { duration: 0.6, ease } } };
+const wordReveal: Variants = { hidden: { opacity: 0, y: "0.35em" }, show: { opacity: 1, y: 0, transition: { duration: 0.6, ease } } };
 const stagger = (each = 0.08, delay = 0): Variants => ({ hidden: {}, show: { transition: { staggerChildren: each, delayChildren: delay } } });
 const inView = { initial: "hidden", whileInView: "show", viewport: { once: true, amount: 0.2 } } as const;
 const tap = { scale: 0.97 };
@@ -216,7 +216,6 @@ export function FaqSite() {
   const activeIndex = open ? categories.findIndex((category) => category.id === open.id) : -1;
 
   const { scrollY, scrollYProgress } = useScroll();
-  const progress = useSpring(scrollYProgress, { stiffness: 140, damping: 30, restDelta: 0.001 });
   useMotionValueEvent(scrollY, "change", (value) => {
     setScrolled(value > 8);
     setShowTop(value > 900);
@@ -285,7 +284,7 @@ export function FaqSite() {
   }
 
   return <MotionConfig reducedMotion="user">
-    <motion.div className="scroll-progress" style={{ scaleX: progress }} aria-hidden="true" />
+    <motion.div className="scroll-progress" style={{ scaleX: scrollYProgress }} aria-hidden="true" />
     <a className="skip-link" href="#main">Skip to content</a>
     <header className={scrolled ? "site-header is-scrolled" : "site-header"} id="top">
       <div className="container header-inner">
