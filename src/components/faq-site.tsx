@@ -180,6 +180,15 @@ function MythOrFact() {
   </section>;
 }
 
+/** Owns its own scroll subscription so showing/hiding it re-renders only this button. */
+function ScrollTopButton() {
+  const [show, setShow] = useState(false);
+  const reduceMotion = useReducedMotion();
+  const { scrollY } = useScroll();
+  useMotionValueEvent(scrollY, "change", (value) => setShow(value > 900));
+  return <AnimatePresence>{show && <motion.button className="floating-top" type="button" aria-label="Scroll to top" initial={{ opacity: 0, y: 16, scale: 0.9 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 16, scale: 0.9 }} whileHover={{ y: -3 }} whileTap={tap} transition={{ type: "spring", stiffness: 400, damping: 28 }} onClick={() => window.scrollTo({ top: 0, behavior: reduceMotion ? "auto" : "smooth" })}><ArrowUp size={20} /></motion.button>}</AnimatePresence>;
+}
+
 type OpenState = { id: string; faq?: string; sheet: boolean; origin: { x: number; y: number } };
 
 /** Id of the FAQ the URL hash points to, if any. */
@@ -282,8 +291,7 @@ export function FaqSite() {
   const [open, setOpen] = useState<OpenState | null>(null);
   const [query, setQuery] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
-  const [scrolled, setScrolled] = useState(false);
-  const [showTop, setShowTop] = useState(false);
+  const headerRef = useRef<HTMLElement>(null);
   const [hoveredNav, setHoveredNav] = useState<string | null>(null);
   const triggerRef = useRef<HTMLElement | null>(null);
   const reduceMotion = useReducedMotion();
@@ -294,10 +302,8 @@ export function FaqSite() {
   const activeIndex = open ? categories.findIndex((category) => category.id === open.id) : -1;
 
   const { scrollY, scrollYProgress } = useScroll();
-  useMotionValueEvent(scrollY, "change", (value) => {
-    setScrolled(value > 8);
-    setShowTop(value > 900);
-  });
+  // Toggled on the DOM directly: a state update here would re-render the whole page mid-scroll.
+  useMotionValueEvent(scrollY, "change", (value) => { headerRef.current?.classList.toggle("is-scrolled", value > 8); });
 
   const pointerX = useMotionValue(0);
   const pointerY = useMotionValue(0);
@@ -364,7 +370,7 @@ export function FaqSite() {
   return <MotionConfig reducedMotion="user">
     <motion.div className="scroll-progress" style={{ scaleX: scrollYProgress }} aria-hidden="true" />
     <a className="skip-link" href="#main">Skip to content</a>
-    <header className={scrolled ? "site-header is-scrolled" : "site-header"} id="top">
+    <header ref={headerRef} className="site-header" id="top">
       <div className="container header-inner">
         <a className="brand" href="#top" aria-label="DOLE Central Luzon, back to top" onClick={browseAll}>
           <Logo />
@@ -485,7 +491,7 @@ export function FaqSite() {
     <footer className="site-footer"><div className="container footer-inner"><div className="footer-brand"><Logo small /><div><strong>DOLE Central Luzon</strong><span>Attendance Monitoring & Leave Administration FAQs</span></div></div><nav aria-label="Footer navigation"><a href="#top">Home</a><a href="#categories">Categories</a><a href="#faqs">Browse FAQs</a></nav></div></footer>
 
     <AnimatePresence>{open && activeIndex >= 0 && <FaqDialog key={open.id} category={categories[activeIndex]} Icon={categoryIcons[activeIndex]} faqId={open.faq} sheet={open.sheet} origin={open.origin} onClose={closeDialog} />}</AnimatePresence>
-    <AnimatePresence>{showTop && <motion.button className="floating-top" type="button" aria-label="Scroll to top" initial={{ opacity: 0, y: 16, scale: 0.9 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 16, scale: 0.9 }} whileHover={{ y: -3 }} whileTap={tap} transition={{ type: "spring", stiffness: 400, damping: 28 }} onClick={() => window.scrollTo({ top: 0, behavior: reduceMotion ? "auto" : "smooth" })}><ArrowUp size={20} /></motion.button>}</AnimatePresence>
+    <ScrollTopButton />
   </MotionConfig>;
 }
 
