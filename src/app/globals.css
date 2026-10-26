@@ -73,7 +73,7 @@ details.faq-item[open] .faq-reveal svg{transform:rotate(180deg);background:#d5e6
 .faq-reveal-close{display:none}
 details.faq-item[open] .faq-reveal-open{display:none}
 details.faq-item[open] .faq-reveal-close{display:inline}
-.faq-answer{overflow:visible;background:linear-gradient(115deg,#f7faff,#fff 74%);border-top:1px solid #cdddf3;padding:0 26px 20px 83px;animation:faq-reveal-in .28s cubic-bezier(.22,1,.36,1) both}
+.faq-answer{overflow:visible;background:linear-gradient(115deg,#f7faff,#fff 74%);border-top:1px solid #cdddf3;padding:0 26px 20px 83px;animation:faq-reveal-in .28s cubic-bezier(.22,1,.36,1)}
 .faq-answer-content{display:grid;grid-template-columns:36px minmax(0,1fr);align-items:start;gap:16px;padding-top:25px}
 .faq-answer-mark{display:grid;place-items:center;width:35px;height:35px;border-radius:9px;background:#e4efff;color:var(--blue)}
 .faq-answer-content p{padding:0;margin:0;max-width:67ch;color:#263d5a;font-size:clamp(15px,1.15vw,17px);line-height:1.75;font-weight:500}
@@ -137,3 +137,5 @@ html{scrollbar-gutter:stable}
 /* Phone sheet enters via CSS (compositor thread) so React mount work can't stall it */
 @keyframes sheet-in{from{transform:translateY(100%)}}
 .dialog-panel.is-sheet{animation:sheet-in .42s cubic-bezier(.32,.72,0,1);box-shadow:0 -12px 40px -16px rgba(7,28,72,.35)}
+/* Taps: no double-tap-zoom wait or grey flash on the popup controls */
+.dialog-panel summary,.dialog-panel button{touch-action:manipulation;-webkit-tap-highlight-color:transparent}

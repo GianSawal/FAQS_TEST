@@ -118,6 +118,13 @@ function faqHashId() {
   return categories.some((category) => category.faqs.some((faq) => faq.id === id)) ? id : null;
 }
 
+/** Toggles in JS instead of relying on the native <summary> toggle, which some mobile browsers drop on the first tap. */
+function toggleItem(event: React.MouseEvent<HTMLElement>) {
+  event.preventDefault();
+  const item = event.currentTarget.parentElement as HTMLDetailsElement;
+  item.open = !item.open;
+}
+
 /** Topic popup: grows out of the clicked card on desktop, slides up as a draggable sheet on phones. */
 function FaqDialog({ category, Icon, faqId, sheet, origin, onClose }: { category: FAQCategory; Icon: LucideIcon; faqId?: string; sheet: boolean; origin: { x: number; y: number }; onClose: () => void }) {
   const isPresent = useIsPresent();
@@ -190,7 +197,7 @@ function FaqDialog({ category, Icon, faqId, sheet, origin, onClose }: { category
         <motion.div className="dialog-body" variants={stagger(0.06, 0.15)} initial={sheet ? false : "hidden"} animate="show">
           <div className="accordion-list">
             {category.faqs.map((faq, index) => <motion.details className="faq-item" id={faq.id} key={faq.id} variants={fadeUp}>
-              <summary className="faq-trigger"><span className="faq-question-index" aria-hidden="true">{String(index + 1).padStart(2, "0")}</span><h4>{faq.question}</h4><span className="faq-reveal"><span className="faq-reveal-open">Read answer</span><span className="faq-reveal-close">Close answer</span><ChevronDown size={18} aria-hidden="true" /></span></summary>
+              <summary className="faq-trigger" onClick={toggleItem}><span className="faq-question-index" aria-hidden="true">{String(index + 1).padStart(2, "0")}</span><h4>{faq.question}</h4><span className="faq-reveal"><span className="faq-reveal-open">Read answer</span><span className="faq-reveal-close">Close answer</span><ChevronDown size={18} aria-hidden="true" /></span></summary>
               <div className="faq-answer"><div className="faq-answer-content"><span className="faq-answer-mark" aria-hidden="true"><Icon size={24} strokeWidth={1.7} /></span><p>{faq.answer}</p></div>{category.faqs[index + 1] && <div className="faq-answer-actions"><button type="button" onClick={() => openFaq(category.faqs[index + 1].id)}>Next question <ArrowRight size={15} /></button></div>}</div>
             </motion.details>)}
           </div>
