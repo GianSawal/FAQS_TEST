@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import { AnimatePresence, MotionConfig, animate, useInView, motion, useDragControls, useIsPresent, useMotionValue, useMotionValueEvent, useReducedMotion, useScroll, useSpring, useTransform, type MotionValue, type Variants } from "framer-motion";
-import { ArrowDown, ArrowRight, ArrowUp, ArrowUpRight, BriefcaseBusiness, Check, ChevronDown, ClipboardCheck, Clock3, FileClock, Fingerprint, Menu, Search, ShieldCheck, X, type LucideIcon } from "lucide-react";
+import { ArrowRight, ArrowUp, ArrowUpRight, BriefcaseBusiness, Check, ChevronDown, ClipboardCheck, Clock3, FileClock, Fingerprint, Menu, Search, ShieldCheck, X, type LucideIcon } from "lucide-react";
 import { categories, faqCount, type FAQCategory } from "@/data/faqs";
 
 const categoryIcons = [Clock3, Fingerprint, FileClock, BriefcaseBusiness];
@@ -141,7 +141,7 @@ function MythOrFact() {
   function next() { setPicked(null); setIndex((value) => value + 1); }
   function restart() { setPicked(null); setScore(0); setIndex(0); }
 
-  return <section className="quiz-section section-space" aria-labelledby="quiz-heading">
+  return <section className="quiz-section section-space" id="quick-check" aria-labelledby="quiz-heading">
     <div className="container quiz-grid">
       <motion.div className="quiz-intro" variants={stagger(0.1)} {...inView}>
         <motion.p className="section-kicker" variants={fadeUp}>QUICK CHECK</motion.p>
@@ -362,6 +362,13 @@ export function FaqSite() {
     setMenuOpen(false);
   }
 
+  /** Scrolls to the search bar and puts the cursor in it, ready to type. */
+  function startSearch(event: React.MouseEvent) {
+    event.preventDefault();
+    document.getElementById("categories")?.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth" });
+    document.getElementById("faq-search")?.focus({ preventScroll: true });
+  }
+
   function handleNav(resets: boolean) {
     if (resets) browseAll();
     else setMenuOpen(false);
@@ -410,8 +417,8 @@ export function FaqSite() {
             </motion.h1>
             <motion.p className="hero-description" variants={fadeUp}>Your quick guide to work schedules, attendance records, official business, and leave-related guidelines.</motion.p>
             <motion.div className="hero-actions" variants={fadeUp}>
-              <motion.a className="button button-primary" href="#faqs" onClick={browseAll} whileHover={{ y: -2 }} whileTap={tap}>Browse all {faqCount} FAQs <ArrowDown size={18} /></motion.a>
-              <motion.a className="button button-ghost" href="#categories" whileHover={{ y: -2 }} whileTap={tap}>Explore topics <ArrowRight size={17} /></motion.a>
+              <motion.a className="button button-primary" href="#categories" onClick={startSearch} whileHover={{ y: -2 }} whileTap={tap}>Search the FAQs <Search size={18} /></motion.a>
+              <motion.a className="button button-ghost" href="#quick-check" whileHover={{ y: -2 }} whileTap={tap}>Take the quick check <ArrowRight size={17} /></motion.a>
             </motion.div>
             <motion.div className="hero-glance-wrap" variants={fadeUp}>
               <p className="glance-heading" id="glance-heading">AT A GLANCE</p>
