@@ -219,3 +219,7 @@ html{scrollbar-gutter:stable}
 .quiz-done p{margin:0 0 6px;color:var(--muted);font-size:14px}
 @media(max-width:800px){.quiz-grid{grid-template-columns:1fr;gap:34px}.quiz-stage{min-height:0}.quiz-card{padding:24px}.quiz-stage:before{inset:12px -6px -10px 10px}}
 
+/* One continuous page background: sections are transparent, glows live on <main> so no section edge clips them */
+#main{background:radial-gradient(700px 520px at 100% 42%,rgba(37,99,235,.09),transparent 70%),radial-gradient(600px 460px at 0 60%,rgba(243,195,29,.09),transparent 70%),radial-gradient(620px 480px at 90% 82%,rgba(243,195,29,.11),transparent 70%),radial-gradient(520px 420px at 5% 88%,rgba(37,99,235,.07),transparent 70%),linear-gradient(180deg,#fbfcff 0,#f3f7ff 40%,#eef4ff 72%,#f6f9ff 100%)}
+.hero{background:radial-gradient(circle at 83% 40%,#dce9ff 0,transparent 32%);border-bottom:0}
+.category-section,.quiz-section{background:none;border-top:0}
