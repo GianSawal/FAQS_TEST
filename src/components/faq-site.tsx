@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
-import { AnimatePresence, MotionConfig, motion, useIsPresent, useMotionValue, useMotionValueEvent, useReducedMotion, useScroll, useSpring, useTransform, type MotionValue, type Variants } from "framer-motion";
-import { ArrowDown, ArrowRight, ArrowUp, ArrowUpRight, BriefcaseBusiness, Check, ChevronDown, ClipboardCheck, Clock3, FileClock, Fingerprint, Menu, Search, ShieldCheck, X } from "lucide-react";
+import { AnimatePresence, MotionConfig, animate, useInView, motion, useDragControls, useIsPresent, useMotionValue, useMotionValueEvent, useReducedMotion, useScroll, useSpring, useTransform, type MotionValue, type Variants } from "framer-motion";
+import { ArrowDown, ArrowRight, ArrowUp, ArrowUpRight, BriefcaseBusiness, Check, ChevronDown, ClipboardCheck, Clock3, FileClock, Fingerprint, Menu, Search, ShieldCheck, X, type LucideIcon } from "lucide-react";
 import { categories, faqCount, type FAQCategory } from "@/data/faqs";
 
 const categoryIcons = [Clock3, Fingerprint, FileClock, BriefcaseBusiness];
@@ -28,15 +28,31 @@ const ease = [0.22, 1, 0.36, 1] as const;
 const fadeUp: Variants = { hidden: { opacity: 0, y: 18 }, show: { opacity: 1, y: 0, transition: { duration: 0.6, ease } } };
 const wordReveal: Variants = { hidden: { opacity: 0, y: "0.35em", filter: "blur(8px)" }, show: { opacity: 1, y: 0, filter: "blur(0px)", transition: { duration: 0.6, ease } } };
 const stagger = (each = 0.08, delay = 0): Variants => ({ hidden: {}, show: { transition: { staggerChildren: each, delayChildren: delay } } });
-const inView = { initial: false, whileInView: "show", viewport: { once: true, amount: 0.2 } } as const;
+const inView = { initial: "hidden", whileInView: "show", viewport: { once: true, amount: 0.2 } } as const;
 const tap = { scale: 0.97 };
 
 function Logo({ small = false }: { small?: boolean }) {
   return <Image className={small ? "logo-image logo-image-small" : "logo-image"} src="/images/dole.jpg" alt="DOLE Central Luzon seal" width={58} height={58} priority={!small} />;
 }
 
+/** Counts 0 → `to` once on first view; renders the final value on the server and with reduced motion. */
 function CountUp({ to }: { to: number }) {
-  return <span>{to}</span>;
+  const ref = useRef<HTMLSpanElement>(null);
+  const seen = useInView(ref, { once: true });
+  const reduceMotion = useReducedMotion();
+  useEffect(() => {
+    if (!seen || reduceMotion || !ref.current) return;
+    const node = ref.current;
+    const controls = animate(0, to, { duration: 1.2, ease, delay: 0.3, onUpdate: (value) => { node.textContent = String(Math.round(value)); } });
+    return () => controls.stop();
+  }, [seen, reduceMotion, to]);
+  return <span ref={ref}>{to}</span>;
+}
+
+/** Brief highlight on the FAQ a link or "Next question" lands on. */
+function flash(item: HTMLElement) {
+  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  animate(item, { boxShadow: ["0 0 0 0 rgba(37,99,235,0)", "0 0 0 5px rgba(37,99,235,.28)", "0 0 0 0 rgba(37,99,235,0)"] }, { duration: 1.1, ease });
 }
 
 function trackSpotlight(event: React.PointerEvent<HTMLElement>) {
@@ -94,25 +110,110 @@ function HeroVisual({ pointerX, pointerY }: { pointerX: MotionValue<number>; poi
   </div>;
 }
 
+type OpenState = { id: string; faq?: string; sheet: boolean; origin: { x: number; y: number } };
+
+/** Id of the FAQ the URL hash points to, if any. */
+function faqHashId() {
+  const id = decodeURIComponent(window.location.hash.slice(1));
+  return categories.some((category) => category.faqs.some((faq) => faq.id === id)) ? id : null;
+}
+
+/** Topic popup: grows out of the clicked card on desktop, slides up as a draggable sheet on phones. */
+function FaqDialog({ category, Icon, faqId, sheet, origin, onClose }: { category: FAQCategory; Icon: LucideIcon; faqId?: string; sheet: boolean; origin: { x: number; y: number }; onClose: () => void }) {
+  const isPresent = useIsPresent();
+  const reduceMotion = useReducedMotion();
+  const panelRef = useRef<HTMLDivElement>(null);
+  const dragControls = useDragControls();
+
+  const openFaq = useCallback((id: string) => {
+    const item = document.getElementById(id) as HTMLDetailsElement | null;
+    if (!item) return;
+    item.open = true;
+    window.history.replaceState(null, "", `#${id}`);
+    item.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "center" });
+    item.querySelector("summary")?.focus({ preventScroll: true });
+    flash(item);
+  }, [reduceMotion]);
+
+  function toggleAll(open: boolean) {
+    panelRef.current?.querySelectorAll<HTMLDetailsElement>("details.faq-item").forEach((item) => { item.open = open; });
+  }
+
+  useEffect(() => {
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    panelRef.current?.focus();
+    return () => { document.body.style.overflow = previous; };
+  }, []);
+
+  useEffect(() => {
+    function onKey(event: KeyboardEvent) {
+      if (event.key === "Escape") { onClose(); return; }
+      if (event.key !== "Tab" || !panelRef.current) return;
+      const focusable = Array.from(panelRef.current.querySelectorAll<HTMLElement>("button, summary, a[href]"));
+      if (!focusable.length) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      const active = document.activeElement;
+      if (event.shiftKey && (active === first || active === panelRef.current)) { event.preventDefault(); last.focus(); }
+      else if (!event.shiftKey && active === last) { event.preventDefault(); first.focus(); }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  useEffect(() => {
+    if (!faqId) return;
+    const timer = window.setTimeout(() => openFaq(faqId), 420);
+    return () => window.clearTimeout(timer);
+  }, [faqId, openFaq]);
+
+  const from = sheet ? { y: "100%" } : { opacity: 0, scale: 0.9, x: origin.x, y: origin.y };
+  return <>
+    <motion.div className="dialog-backdrop" onClick={onClose} aria-hidden="true" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.25 }} />
+    <div className="dialog-layer">
+      <motion.div ref={panelRef} className="dialog-panel" role="dialog" aria-modal="true" aria-labelledby="dialog-title" tabIndex={-1} style={{ pointerEvents: isPresent ? undefined : "none" }}
+        initial={from} animate={sheet ? { y: 0 } : { opacity: 1, scale: 1, x: 0, y: 0 }} exit={{ ...from, transition: { duration: 0.22, ease } }} transition={{ type: "spring", stiffness: 320, damping: 34 }}
+        drag={sheet ? "y" : false} dragControls={dragControls} dragListener={false} dragConstraints={{ top: 0, bottom: 0 }} dragElastic={{ top: 0, bottom: 0.6 }}
+        onDragEnd={(_, info) => { if (info.offset.y > 110 || info.velocity.y > 600) onClose(); }}>
+        <div className="dialog-head">
+          {sheet && <div className="dialog-handle" aria-hidden="true" onPointerDown={(event) => dragControls.start(event)}><span /></div>}
+          <div className="dialog-title-row">
+            <span className="faq-group-icon"><Icon size={22} strokeWidth={1.8} /></span>
+            <div><p>{category.faqs.length} {category.faqs.length === 1 ? "QUESTION" : "QUESTIONS"}</p><h3 id="dialog-title">{category.title}</h3></div>
+            <motion.button className="dialog-close" type="button" aria-label="Close" whileTap={tap} onClick={onClose}><X size={20} /></motion.button>
+          </div>
+          <p className="dialog-desc">{category.description}</p>
+          <div className="faq-list-actions"><button type="button" onClick={() => toggleAll(true)}>Expand all</button><button type="button" onClick={() => toggleAll(false)}>Collapse all</button></div>
+        </div>
+        <motion.div className="dialog-body" variants={stagger(0.06, 0.15)} initial="hidden" animate="show">
+          <div className="accordion-list">
+            {category.faqs.map((faq, index) => <motion.details className="faq-item" id={faq.id} key={faq.id} variants={fadeUp}>
+              <summary className="faq-trigger"><span className="faq-question-index" aria-hidden="true">{String(index + 1).padStart(2, "0")}</span><h4>{faq.question}</h4><span className="faq-reveal"><span className="faq-reveal-open">Read answer</span><span className="faq-reveal-close">Close answer</span><ChevronDown size={18} aria-hidden="true" /></span></summary>
+              <div className="faq-answer"><div className="faq-answer-content"><span className="faq-answer-mark" aria-hidden="true"><Icon size={24} strokeWidth={1.7} /></span><p>{faq.answer}</p></div>{category.faqs[index + 1] && <div className="faq-answer-actions"><button type="button" onClick={() => openFaq(category.faqs[index + 1].id)}>Next question <ArrowRight size={15} /></button></div>}</div>
+            </motion.details>)}
+          </div>
+          <motion.div className="remember-note" variants={fadeUp}><span className="remember-icon"><Check size={17} /></span><p><strong>Remember</strong><br />{category.remember}</p></motion.div>
+        </motion.div>
+      </motion.div>
+    </div>
+  </>;
+}
+
 export function FaqSite() {
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [open, setOpen] = useState<OpenState | null>(null);
   const [query, setQuery] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [showTop, setShowTop] = useState(false);
   const [hoveredNav, setHoveredNav] = useState<string | null>(null);
+  const triggerRef = useRef<HTMLElement | null>(null);
   const reduceMotion = useReducedMotion();
-  const visibleCategories = useMemo(() => categories
-    .filter((category) => !selectedCategory || category.id === selectedCategory)
-    .map((category) => ({ ...category, faqs: category.faqs.filter((faq) => {
-      const term = query.trim().toLocaleLowerCase();
-      return !term || [faq.question, faq.answer, ...(faq.keywords ?? [])].some((text) => text.toLocaleLowerCase().includes(term));
-    }) }))
-    .filter((category) => category.faqs.length > 0), [query, selectedCategory]);
-  const resultCount = visibleCategories.reduce((sum, category) => sum + category.faqs.length, 0);
-  const showLeave = !selectedCategory && (!query || /leave|administration/i.test(query));
-  const resultsTitle = query ? `Results for “${query}”` : selectedCategory ? categories.find((category) => category.id === selectedCategory)?.title : "All questions";
-  const resultsMeta = query || selectedCategory ? `${resultCount} ${resultCount === 1 ? "answer" : "answers"}` : `${faqCount} answers in ${categories.length} topics`;
+  const term = query.trim().toLocaleLowerCase();
+  const matches = useMemo(() => !term ? [] : categories.flatMap((category, index) => category.faqs
+    .filter((faq) => [faq.question, faq.answer, ...(faq.keywords ?? [])].some((text) => text.toLocaleLowerCase().includes(term)))
+    .map((faq) => ({ faq, category, Icon: categoryIcons[index] }))), [term]);
+  const activeIndex = open ? categories.findIndex((category) => category.id === open.id) : -1;
 
   const { scrollY, scrollYProgress } = useScroll();
   const progress = useSpring(scrollYProgress, { stiffness: 140, damping: 30, restDelta: 0.001 });
@@ -133,56 +234,47 @@ export function FaqSite() {
     pointerY.set((event.clientY - rect.top) / rect.height - 0.5);
   }
 
+  const openDialog = useCallback((id: string, faq?: string, trigger?: HTMLElement) => {
+    const rect = trigger?.getBoundingClientRect();
+    triggerRef.current = trigger ?? null;
+    setOpen({
+      id, faq,
+      sheet: window.matchMedia("(max-width: 620px)").matches,
+      origin: rect ? { x: rect.left + rect.width / 2 - window.innerWidth / 2, y: rect.top + rect.height / 2 - window.innerHeight / 2 } : { x: 0, y: 24 }
+    });
+  }, []);
+
+  const closeDialog = useCallback(() => {
+    setOpen(null);
+    if (faqHashId()) window.history.replaceState(null, "", window.location.pathname + window.location.search);
+    triggerRef.current?.focus({ preventScroll: true });
+  }, []);
+
   useEffect(() => {
     function openHash() {
-      const id = decodeURIComponent(window.location.hash.slice(1));
+      const id = faqHashId();
       const category = categories.find((item) => item.faqs.some((faq) => faq.id === id));
-      if (!category) return;
-      setSelectedCategory(null);
+      if (!id || !category) return;
       setQuery("");
-      window.setTimeout(() => {
-        const item = document.getElementById(id) as HTMLDetailsElement | null;
-        if (item) { item.open = true; item.scrollIntoView({ block: "center" }); }
-      }, 80);
+      openDialog(category.id, id);
     }
     openHash();
     window.addEventListener("hashchange", openHash);
     return () => window.removeEventListener("hashchange", openHash);
-  }, []);
+  }, [openDialog]);
 
   useEffect(() => {
     function focusSearch(event: KeyboardEvent) {
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
         event.preventDefault();
-        document.getElementById("faq-search")?.focus();
+        if (!open) document.getElementById("faq-search")?.focus();
       }
     }
     window.addEventListener("keydown", focusSearch);
     return () => window.removeEventListener("keydown", focusSearch);
-  }, []);
-
-  function openFaq(id: string) {
-    const item = document.getElementById(id) as HTMLDetailsElement | null;
-    if (!item) return;
-    item.open = true;
-    window.history.replaceState(null, "", `#${id}`);
-    item.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "center" });
-    item.querySelector("summary")?.focus({ preventScroll: true });
-  }
-
-  function toggleAll(open: boolean) {
-    document.querySelectorAll<HTMLDetailsElement>(".faq-content details.faq-item").forEach((item) => { item.open = open; });
-  }
-
-  function selectCategory(id: string | null) {
-    setSelectedCategory(id);
-    setQuery("");
-    setMenuOpen(false);
-    window.setTimeout(() => document.getElementById("faqs")?.scrollIntoView({ behavior: "smooth" }), 0);
-  }
+  }, [open]);
 
   function browseAll() {
-    setSelectedCategory(null);
     setQuery("");
     setMenuOpen(false);
   }
@@ -203,7 +295,7 @@ export function FaqSite() {
         </a>
         <nav className="desktop-nav" aria-label="Primary navigation" onPointerLeave={() => setHoveredNav(null)}>
           {navLinks.map((link) => <a key={link.href} href={link.href} onPointerEnter={() => setHoveredNav(link.href)} onFocus={() => setHoveredNav(link.href)} onClick={() => handleNav(link.resets)}>
-            {hoveredNav === link.href && <motion.span className="nav-pill" layoutId="nav-pill" transition={{ type: "spring", stiffness: 500, damping: 38 }} />}
+            {hoveredNav === link.href && <motion.span className="nav-pill" layoutId="nav-pill" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ type: "spring", stiffness: 500, damping: 38 }} />}
             <span className="nav-label">{link.label}</span>
           </a>)}
         </nav>
@@ -222,10 +314,10 @@ export function FaqSite() {
       <section className="hero" aria-labelledby="page-title" onPointerMove={trackHeroPointer} onPointerLeave={() => { pointerX.set(0); pointerY.set(0); }}>
         <div className="hero-backdrop" aria-hidden="true"><span className="hero-glow hero-glow-blue" /><span className="hero-glow hero-glow-gold" /></div>
         <div className="container hero-grid">
-          <motion.div className="hero-copy" variants={stagger(0.12)} initial={false} animate="show">
+          <motion.div className="hero-copy" variants={stagger(0.12)} initial="hidden" animate="show">
             <motion.p className="eyebrow" variants={fadeUp}><span className="eyebrow-line" /> DOLE CENTRAL LUZON <span className="eyebrow-separator">/</span> PERSONNEL REFERENCE GUIDE</motion.p>
             <motion.h1 id="page-title" variants={stagger(0.05)}>
-              {titleParts.map((part, partIndex) => <span key={part.text}>
+              {titleParts.map((part, partIndex) => <span key={part.text} className={`title-line title-line-${partIndex}`}>
                 {partIndex > 0 && " "}
                 {part.text.split(" ").map((word, index) => <span key={word}>
                   {index > 0 && " "}
@@ -255,79 +347,46 @@ export function FaqSite() {
         </div>
       </section>
 
-      <section className="category-section section-space" id="categories" aria-labelledby="category-heading">
+      <section className="category-section section-space" id="faqs" aria-labelledby="category-heading">
         <div className="container">
           <motion.div className="section-heading" variants={stagger(0.1)} {...inView}>
             <motion.p className="section-kicker" variants={fadeUp}>FIND YOUR TOPIC</motion.p>
             <motion.h2 id="category-heading" variants={fadeUp}>Guidance, organized around your workday.</motion.h2>
-            <motion.p variants={fadeUp}>Choose a topic to focus the questions below, or browse all {faqCount} answers.</motion.p>
+            <motion.p variants={fadeUp}>Choose a topic to open its questions, or search all {faqCount} answers. For official interpretation, consult the current signed issuances and your authorized HR/personnel office.</motion.p>
           </motion.div>
-          <motion.div className="category-grid" variants={stagger(0.08)} {...inView}>{categories.map((category, index) => {
-            const Icon = categoryIcons[index];
-            return <motion.button className="category-card" type="button" key={category.id} variants={fadeUp} whileHover={{ y: -5 }} whileTap={{ scale: 0.985 }} transition={{ type: "spring", stiffness: 400, damping: 30 }} onPointerMove={trackSpotlight} onClick={() => selectCategory(category.id)}>
-              <span className="category-icon"><Icon size={27} strokeWidth={1.8} /></span>
-              <span className="category-content"><span className="category-title">{category.title}</span><span className="category-description">{category.description}</span><span className="category-count">{category.faqs.length} FAQs</span></span>
-              <ArrowUpRight className="category-arrow" size={20} />
-            </motion.button>;
-          })}</motion.div>
-          <motion.div className="leave-preview" variants={fadeUp} {...inView}><div className="leave-icon"><FileClock size={23} /></div><div><strong>Leave Administration</strong><p>Leave administration FAQs will be published once verified and approved.</p></div><span>COMING SOON</span></motion.div>
-        </div>
-      </section>
-
-      <section className="faq-section section-space" id="faqs" aria-labelledby="faq-heading">
-        <div className="container">
-          <motion.div className="faq-section-heading" variants={stagger(0.1)} initial={false}>
-            <motion.p className="section-kicker" variants={fadeUp}>THE FAQ LIBRARY</motion.p>
-            <motion.h2 id="faq-heading" variants={fadeUp}>Questions first. Answers when you need them.</motion.h2>
-            <motion.p variants={fadeUp}>Scan the questions, search a term, then open the answer you need. For official interpretation, consult the current signed issuances and your authorized HR/personnel office.</motion.p>
-          </motion.div>
-          <div className="faq-search-panel">
-            <label htmlFor="faq-search"><Search size={19} aria-hidden="true" /><span>Search this guide</span></label>
-            <div className="faq-search-field">
-              <input id="faq-search" type="search" value={query} onChange={(event) => { setQuery(event.target.value); setSelectedCategory(null); }} placeholder="Try DTR, biometric, overtime, OB, or FWA" autoComplete="off" />
-              <span className="faq-search-shortcut" aria-hidden="true">Ctrl / ⌘ K</span>
-            </div>
-          </div>
-          <div className="faq-layout">
-            <aside className="faq-sidebar" aria-label="FAQ categories"><div className="sidebar-inner">
-              <p className="sidebar-label">BROWSE BY TOPIC</p>
-              {[{ id: null, title: "All questions", count: faqCount }, ...categories.map((category) => ({ id: category.id, title: category.title, count: category.faqs.length }))].map((item) => {
-                const active = selectedCategory === item.id;
-                return <button className={active ? "sidebar-link active" : "sidebar-link"} type="button" key={item.id ?? "all"} aria-pressed={active} onClick={() => selectCategory(item.id)}>
-                  {active && <motion.span className="sidebar-indicator" layoutId="sidebar-indicator" transition={{ type: "spring", stiffness: 480, damping: 40 }} />}
-                  <span>{item.title}</span><span>{item.count}</span>
-                </button>;
-              })}
-            </div></aside>
-            <div className="faq-content">
-              <div className="results-bar">
-                <div>
-                  <motion.strong key={resultsTitle} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, ease }}>{resultsTitle}</motion.strong>
-                  <motion.span key={resultsMeta} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.25, delay: 0.05 }}>{resultsMeta}</motion.span>
-                </div>
-                <div className="faq-list-actions">
-                  <button type="button" onClick={() => toggleAll(true)}>Expand all</button>
-                  <button type="button" onClick={() => toggleAll(false)}>Collapse all</button>
-                  {(selectedCategory || query) && <button type="button" onClick={() => { setSelectedCategory(null); setQuery(""); }}>Clear filters <X size={15} /></button>}
-                </div>
+          <div id="categories">
+            <div className="faq-search-panel">
+              <label htmlFor="faq-search"><Search size={19} aria-hidden="true" /><span>Search this guide</span></label>
+              <div className="faq-search-field">
+                <input id="faq-search" type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Try DTR, biometric, overtime, OB, or FWA" autoComplete="off" />
+                <span className="faq-search-shortcut" aria-hidden="true">Ctrl / ⌘ K</span>
               </div>
-              {visibleCategories.map((category: FAQCategory) => {
-                const Icon = categoryIcons[categories.findIndex((item) => item.id === category.id)];
-                return <section className="faq-group" key={category.id} aria-labelledby={`${category.id}-heading`}>
-                  <div className="faq-group-head"><span className="faq-group-icon"><Icon size={22} strokeWidth={1.8} /></span><div><p>{category.id === "work-schedule" ? "WORK SCHEDULE" : "RECORDS OF ATTENDANCE"}</p><h3 id={`${category.id}-heading`}>{category.title}</h3></div><span className="group-count">{category.faqs.length} {category.faqs.length === 1 ? "QUESTION" : "QUESTIONS"}</span></div>
-                  <div className="accordion-list">
-                    {category.faqs.map((faq, index) => <details className="faq-item" id={faq.id} key={faq.id}>
-                      <summary className="faq-trigger"><span className="faq-question-index" aria-hidden="true">{String(index + 1).padStart(2, "0")}</span><h4>{faq.question}</h4><span className="faq-reveal"><span className="faq-reveal-open">Read answer</span><span className="faq-reveal-close">Close answer</span><ChevronDown size={18} aria-hidden="true" /></span></summary>
-                      <div className="faq-answer"><div className="faq-answer-content"><span className="faq-answer-mark" aria-hidden="true"><Icon size={24} strokeWidth={1.7} /></span><p>{faq.answer}</p></div>{category.faqs[index + 1] && <div className="faq-answer-actions"><button type="button" onClick={() => openFaq(category.faqs[index + 1].id)}>Next question <ArrowRight size={15} /></button></div>}</div>
-                    </details>)}
-                  </div>
-                  <div className="remember-note"><span className="remember-icon"><Check size={17} /></span><p><strong>Remember</strong><br />{category.remember}</p></div>
-                  <a className="back-to-top" href="#top">Back to top <ArrowRight size={15} /></a>
-                </section>;
-              })}
-              {!visibleCategories.length && !showLeave && <div className="empty-state"><Search size={26} /><h3>No matching answers found</h3><p>Try another term, or clear the search to browse all questions.</p><button type="button" onClick={() => setQuery("")}>Show all FAQs <ArrowRight size={16} /></button></div>}
-              {showLeave && <motion.div className="leave-notice" id="leave-administration" variants={fadeUp} {...inView}><span className="leave-notice-icon"><FileClock size={21} /></span><div><h3>Leave Administration</h3><p>Additional leave administration questions will appear here after HR verification.</p></div></motion.div>}
             </div>
+            {term ? <motion.div className="search-results" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, ease }}>
+              <div className="results-bar">
+                <div><strong>Results for “{query.trim()}”</strong><span>{matches.length} {matches.length === 1 ? "answer" : "answers"}</span></div>
+                <div className="faq-list-actions"><button type="button" onClick={() => setQuery("")}>Clear search <X size={15} /></button></div>
+              </div>
+              {matches.length ? <motion.ul className="result-list" variants={stagger(0.04)} initial="hidden" animate="show">
+                {matches.map(({ faq, category, Icon }) => <motion.li key={faq.id} variants={fadeUp}>
+                  <button className="result-item" type="button" aria-haspopup="dialog" onClick={(event) => openDialog(category.id, faq.id, event.currentTarget)}>
+                    <span className="result-icon"><Icon size={18} /></span>
+                    <span className="result-text"><strong>{faq.question}</strong><small>{category.title}</small></span>
+                    <ArrowUpRight size={18} />
+                  </button>
+                </motion.li>)}
+              </motion.ul> : <div className="empty-state"><Search size={26} /><h3>No matching answers found</h3><p>{/leave/i.test(term) ? "Leave administration FAQs will be published once verified and approved." : "Try another term, or clear the search to browse by topic."}</p><button type="button" onClick={() => setQuery("")}>Show all topics <ArrowRight size={16} /></button></div>}
+            </motion.div> : <>
+              <motion.div className="category-grid" variants={stagger(0.08)} {...inView}>{categories.map((category, index) => {
+                const Icon = categoryIcons[index];
+                return <motion.button className="category-card" type="button" key={category.id} aria-haspopup="dialog" variants={fadeUp} whileHover={{ y: -5 }} whileTap={{ scale: 0.985 }} transition={{ type: "spring", stiffness: 400, damping: 30 }} onPointerMove={trackSpotlight} onClick={(event) => openDialog(category.id, undefined, event.currentTarget)}>
+                  <span className="category-icon"><Icon size={27} strokeWidth={1.8} /></span>
+                  <span className="category-content"><span className="category-title">{category.title}</span><span className="category-description">{category.description}</span><span className="category-count">{category.faqs.length} FAQs</span></span>
+                  <ArrowUpRight className="category-arrow" size={20} />
+                </motion.button>;
+              })}</motion.div>
+              <motion.div className="leave-preview" variants={fadeUp} {...inView}><div className="leave-icon"><FileClock size={23} /></div><div><strong>Leave Administration</strong><p>Leave administration FAQs will be published once verified and approved.</p></div><span>COMING SOON</span></motion.div>
+            </>}
           </div>
         </div>
       </section>
@@ -336,6 +395,7 @@ export function FaqSite() {
     </main>
     <footer className="site-footer"><div className="container footer-inner"><div className="footer-brand"><Logo small /><div><strong>DOLE Central Luzon</strong><span>Attendance Monitoring & Leave Administration FAQs</span></div></div><nav aria-label="Footer navigation"><a href="#top">Home</a><a href="#categories">Categories</a><a href="#faqs">Browse FAQs</a></nav></div></footer>
 
+    <AnimatePresence>{open && activeIndex >= 0 && <FaqDialog key={open.id} category={categories[activeIndex]} Icon={categoryIcons[activeIndex]} faqId={open.faq} sheet={open.sheet} origin={open.origin} onClose={closeDialog} />}</AnimatePresence>
     <AnimatePresence>{showTop && <motion.button className="floating-top" type="button" aria-label="Scroll to top" initial={{ opacity: 0, y: 16, scale: 0.9 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 16, scale: 0.9 }} whileHover={{ y: -3 }} whileTap={tap} transition={{ type: "spring", stiffness: 400, damping: 28 }} onClick={() => window.scrollTo({ top: 0, behavior: reduceMotion ? "auto" : "smooth" })}><ArrowUp size={20} /></motion.button>}</AnimatePresence>
   </MotionConfig>;
 }
