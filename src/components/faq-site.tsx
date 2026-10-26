@@ -461,11 +461,12 @@ export function FaqSite() {
               <motion.div className="category-grid" variants={stagger(0.08)} {...inView}>{categories.map((category, index) => {
                 const Icon = categoryIcons[index];
                 return <motion.button className="category-card" type="button" key={category.id} aria-haspopup="dialog" variants={fadeUp} whileHover={{ y: -5 }} whileTap={{ scale: 0.985 }} transition={{ type: "spring", stiffness: 400, damping: 30 }} onPointerMove={trackSpotlight} onClick={(event) => openDialog(category.id, undefined, event.currentTarget)}>
+                  <Icon className="category-watermark" size={170} strokeWidth={1.1} aria-hidden="true" />
                   <span className="category-icon"><Icon size={27} strokeWidth={1.8} /></span>
                   <span className="category-content">
                     <span className="category-title">{category.title}</span>
                     <span className="category-description">{category.description}</span>
-                    <span className="category-preview">{category.faqs.slice(0, 2).map((faq) => <span key={faq.id}>{faq.question}</span>)}</span>
+                    <span className="category-preview">{category.faqs.slice(0, index % 3 === 0 ? 3 : 2).map((faq) => <span key={faq.id}>{faq.question}</span>)}</span>
                     <span className="category-foot"><span className="category-count">{category.faqs.length} FAQs</span><span className="category-open">Open topic <ArrowRight size={14} /></span></span>
                   </span>
                   <ArrowUpRight className="category-arrow" size={20} />

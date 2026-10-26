@@ -223,3 +223,14 @@ html{scrollbar-gutter:stable}
 #main{background:radial-gradient(700px 520px at 100% 42%,rgba(37,99,235,.09),transparent 70%),radial-gradient(600px 460px at 0 60%,rgba(243,195,29,.09),transparent 70%),radial-gradient(620px 480px at 90% 82%,rgba(243,195,29,.11),transparent 70%),radial-gradient(520px 420px at 5% 88%,rgba(37,99,235,.07),transparent 70%),linear-gradient(180deg,#fbfcff 0,#f3f7ff 40%,#eef4ff 72%,#f6f9ff 100%)}
 .hero{background:radial-gradient(circle at 83% 40%,#dce9ff 0,transparent 32%);border-bottom:0}
 .category-section,.quiz-section{background:none;border-top:0}
+/* Topic cards: bento layout (wide cards 1 and 4), accent tint, watermark icon */
+.category-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
+.category-card:nth-child(1),.category-card:nth-child(4){grid-column:span 2}
+.category-card{background:linear-gradient(150deg,var(--accent-soft) 0%,#fff 58%);border-color:color-mix(in srgb,var(--accent) 16%,#fff)}
+.category-card>:not(.category-watermark):not(.category-arrow){position:relative;z-index:1}.category-arrow{z-index:1}
+.category-watermark{position:absolute;right:-26px;bottom:-34px;color:var(--accent);opacity:.07;pointer-events:none;transition:transform .6s cubic-bezier(.22,1,.36,1),opacity .3s}
+.category-card:hover .category-watermark{transform:rotate(-10deg) scale(1.06);opacity:.11}
+.category-grid .category-card .category-icon{transition:transform .35s cubic-bezier(.22,1,.36,1),background-color .25s,color .25s}
+.category-grid .category-card:hover .category-icon{background:var(--accent);color:#fff}
+@media(max-width:800px){.category-grid{grid-template-columns:1fr}.category-card:nth-child(1),.category-card:nth-child(4){grid-column:auto}.category-watermark{width:130px;height:130px}}
+.category-grid .category-card .category-icon{background:#fff;color:var(--accent);box-shadow:0 8px 18px -10px color-mix(in srgb,var(--accent) 55%,transparent)}
